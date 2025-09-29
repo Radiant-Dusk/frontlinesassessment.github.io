@@ -1,2 +1,164 @@
-# frontlinesassessment.github.io
-Thingy
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>PDF Uploader — 4 files</title>
+  <style>
+    :root{--bg:#0f1724;--card:#0b1220;--muted:#94a3b8;--accent:#60a5fa}
+    html,body{height:100%;margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial}
+    body{background:linear-gradient(180deg,#071026 0%, #07172a 100%);color:#e6eef8;display:flex;align-items:center;justify-content:center;padding:28px}
+    .container{width:100%;max-width:920px}
+    h1{font-size:20px;margin:0 0 12px}
+    p.lead{margin:0 0 20px;color:var(--muted)}
+
+    .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
+
+    .card{background:rgba(255,255,255,0.03);padding:12px;border-radius:10px;border:1px solid rgba(255,255,255,0.03)}
+    .slot-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+    .slot-head strong{font-size:13px}
+    .drop{min-height:120px;border:2px dashed rgba(255,255,255,0.04);border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:12px;gap:8px;background:linear-gradient(180deg, rgba(255,255,255,0.01), transparent)}
+    .drop input[type=file]{position:absolute;opacity:0;inset:0;cursor:pointer}
+    .muted{color:var(--muted);font-size:13px}
+    .meta{font-size:12px;color:var(--muted);margin-top:6px}
+    .preview{margin-top:10px;border-radius:6px;overflow:hidden;background:#071426}
+    iframe.preview-frame{width:100%;height:240px;border:0}
+
+    .actions{display:flex;gap:10px;justify-content:flex-end;margin-top:16px}
+    button{background:var(--accent);border:0;padding:10px 14px;border-radius:8px;color:#05263a;font-weight:600;cursor:pointer}
+    button.secondary{background:transparent;border:1px solid rgba(255,255,255,0.04);color:var(--muted)}
+
+    @media (max-width:720px){.grid{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+  <main class="container" role="main">
+    <h1>Upload up to 4 PDF documents</h1>
+    <p class="lead">Choose four PDF files below. Each slot accepts only PDFs and previews the selected file inline. No server code included — this is a static HTML prototype.</p>
+
+    <form id="pdfForm" class="grid" onsubmit="handleSubmit(event)">
+      <!-- Slot template repeated 4 times -->
+
+      <div class="card" data-slot="1">
+        <div class="slot-head"><strong>Document 1</strong><span class="muted">required</span></div>
+        <label class="drop" for="file1" aria-label="Upload PDF for document 1">
+          <input id="file1" name="file1" type="file" accept="application/pdf" required />
+          <div class="muted">Drop a PDF here or click to select</div>
+          <div class="meta" id="meta1"></div>
+        </label>
+        <div class="preview" id="preview1" aria-hidden="true"></div>
+      </div>
+
+      <div class="card" data-slot="2">
+        <div class="slot-head"><strong>Document 2</strong><span class="muted">required</span></div>
+        <label class="drop" for="file2" aria-label="Upload PDF for document 2">
+          <input id="file2" name="file2" type="file" accept="application/pdf" required />
+          <div class="muted">Drop a PDF here or click to select</div>
+          <div class="meta" id="meta2"></div>
+        </label>
+        <div class="preview" id="preview2" aria-hidden="true"></div>
+      </div>
+
+      <div class="card" data-slot="3">
+        <div class="slot-head"><strong>Document 3</strong><span class="muted">optional</span></div>
+        <label class="drop" for="file3" aria-label="Upload PDF for document 3">
+          <input id="file3" name="file3" type="file" accept="application/pdf" />
+          <div class="muted">Drop a PDF here or click to select</div>
+          <div class="meta" id="meta3"></div>
+        </label>
+        <div class="preview" id="preview3" aria-hidden="true"></div>
+      </div>
+
+      <div class="card" data-slot="4">
+        <div class="slot-head"><strong>Document 4</strong><span class="muted">optional</span></div>
+        <label class="drop" for="file4" aria-label="Upload PDF for document 4">
+          <input id="file4" name="file4" type="file" accept="application/pdf" />
+          <div class="muted">Drop a PDF here or click to select</div>
+          <div class="meta" id="meta4"></div>
+        </label>
+        <div class="preview" id="preview4" aria-hidden="true"></div>
+      </div>
+
+      <div style="grid-column:1 / -1;display:flex;justify-content:flex-end;gap:10px;align-items:center">
+        <button type="submit">Prepare files</button>
+        <button type="button" class="secondary" onclick="resetForm()">Reset</button>
+      </div>
+    </form>
+
+    <p style="margin-top:14px;color:var(--muted);font-size:13px">Notes: file inputs use <code>accept="application/pdf"</code> to hint file pickers. This page is static — to actually upload files you'll need server-side handling (POST target) or client-side upload via fetch/XHR.</p>
+  </main>
+
+  <script>
+    const MAX_BYTES = 12 * 1024 * 1024; // 12 MB per file limit (change as you like)
+
+    function bytesToSize(bytes){
+      const units = ['B','KB','MB','GB']; let i=0; while(bytes>=1024 && i<units.length-1){bytes/=1024;i++} return bytes.toFixed(2)+units[i]
+    }
+
+    function handleFileInput(inputEl, metaEl, previewEl){
+      const file = inputEl.files && inputEl.files[0];
+      metaEl.textContent = '';
+      previewEl.innerHTML = '';
+      previewEl.setAttribute('aria-hidden', 'true');
+      if(!file) return;
+      if(file.type !== 'application/pdf'){
+        metaEl.textContent = 'Invalid file type — please choose a PDF.';
+        inputEl.value = '';
+        return;
+      }
+      if(file.size > MAX_BYTES){
+        metaEl.textContent = `File too large (${bytesToSize(file.size)}). Max is ${bytesToSize(MAX_BYTES)}.`;
+        inputEl.value = '';
+        return;
+      }
+      metaEl.textContent = `${file.name} — ${bytesToSize(file.size)}`;
+
+      // show inline preview using object URL
+      const url = URL.createObjectURL(file);
+      const iframe = document.createElement('iframe');
+      iframe.className = 'preview-frame';
+      iframe.src = url;
+      iframe.title = `Preview of ${file.name}`;
+      previewEl.appendChild(iframe);
+      previewEl.setAttribute('aria-hidden', 'false');
+
+      // revoke object URL after iframe loads to free memory
+      iframe.addEventListener('load', () => {
+        try{ URL.revokeObjectURL(url); }catch(e){}
+      });
+    }
+
+    // wire up listeners
+    for(let i=1;i<=4;i++){
+      const input = document.getElementById('file'+i);
+      const meta = document.getElementById('meta'+i);
+      const preview = document.getElementById('preview'+i);
+      input.addEventListener('change', ()=> handleFileInput(input, meta, preview));
+
+      // support drag-over visuals (basic)
+      const label = input.closest('.drop');
+      label.addEventListener('dragover', (e)=>{ e.preventDefault(); label.style.borderColor='rgba(96,165,250,0.9)'; });
+      label.addEventListener('dragleave', ()=>{ label.style.borderColor=''; });
+      label.addEventListener('drop', (e)=>{ e.preventDefault(); label.style.borderColor='';
+        const dt = e.dataTransfer; if(dt && dt.files && dt.files.length) input.files = dt.files; input.dispatchEvent(new Event('change'));
+      });
+    }
+
+    function resetForm(){
+      document.getElementById('pdfForm').reset();
+      for(let i=1;i<=4;i++){ document.getElementById('meta'+i).textContent=''; document.getElementById('preview'+i).innerHTML=''; document.getElementById('preview'+i).setAttribute('aria-hidden','true') }
+    }
+
+    function handleSubmit(e){
+      e.preventDefault();
+      // gather files and show a small summary — actual upload would require server code
+      const summary = [];
+      for(let i=1;i<=4;i++){
+        const f = document.getElementById('file'+i).files[0];
+        summary.push(f ? `${i}: ${f.name} (${bytesToSize(f.size)})` : `${i}: (no file)`);
+      }
+      alert('Files ready:\n' + summary.join('\n') + '\n\nTo upload: add server endpoint or use fetch to send FormData.');
+    }
+  </script>
+</body>
+</html>
